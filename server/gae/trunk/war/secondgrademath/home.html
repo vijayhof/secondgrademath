@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Second Grade Math</title>
+<!-- meta name="viewport" content="width=device-width, initial-scale=1" -->
+<meta name="viewport"
+    content="width=device-width; initial-scale=1.0; maximum-scale=1.0; minimum-scale=1.0; user-scalable=no;" />
+<link rel="stylesheet" href="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.css" />
+<script src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
+<script src="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.js"></script>
+
+
+<script type="text/javascript">
+    var DEFAULT_TABLE_OF = 5;
+    var DEFAULT_OPERATOR_TYPE = '+';
+
+    // cache variables
+    var CM_TABLE_OF = "tableOf";
+    var CM_OPERATOR_TYPE = "operatorType";
+
+    var gOpType = '+';
+    var gShowJumble = false;
+    var gShowTap = false;
+
+    var gMaxNum = 10;
+    var gNumQuestions = 10;
+    var gIsFixedFirstNum = true;
+</script>
+
+<!-- admob script -->
+<script type="text/javascript">
+    var admob_vars = {
+        pubid : 'a14e7e374628b8b', // publisher id
+        bgcolor : 'C62919', // background color (hex)
+        text : 'FFFFFF', // font-color (hex)
+        test : false
+    // test mode, set to false to receive live ads
+    };
+</script>
+<script type="text/javascript" src="http://mmv.admob.com/static/iphone/iadmob.js"></script>
+
+<script type="text/javascript">
+    // flash card arrays
+    var firstNumberArr = new Array();
+    var secondNumberArr = new Array();
+    var operatorArr = new Array();
+    var answersArr = new Array();
+    var rightOrWrongArr = new Array();
+
+    // table of - stores what number is currently used
+    function getTableOf()
+    {
+        if (localStorage.getItem(CM_TABLE_OF))
+        {
+            return parseInt(localStorage.getItem(CM_TABLE_OF));
+        }
+
+        return DEFAULT_TABLE_OF;
+    }
+
+    function setTableOf(tableOf)
+    {
+        localStorage.setItem(CM_TABLE_OF, tableOf);
+    }
+
+    // operator type - stores what operator type - +, -, etc is currently used
+    function getOperatorType()
+    {
+        if (localStorage.getItem(CM_TABLE_OF))
+        {
+            return localStorage.getItem(CM_OPERATOR_TYPE);
+        }
+
+        return DEFAULT_OPERATOR_TYPE;
+    }
+
+    function setOperatorType(operatorType)
+    {
+        localStorage.setItem(CM_OPERATOR_TYPE, operatorType);
+    }
+
+    // Utility functions
+    // stop event progress
+    function kb_stopEventProgress()
+    {
+        return false;
+    }
+
+    function kb_getScreenWidth()
+    {
+        return document.documentElement.clientWidth;
+    }
+
+    function kb_getScreenHeight()
+    {
+        return document.documentElement.clientHeight;
+    }
+
+    function highlightItem(element)
+    {
+        if (element == null)
+        {
+            return;
+        }
+
+        element.style.backgroundImage = "-webkit-gradient(linear, left top, left bottom,from(rgb(72,181,204)),color-stop(0.55, rgb(0,137,225)) ,to(rgb(22,156,235)))";
+        element.style.color = "white";
+    }
+
+    function disHighlightItem(element)
+    {
+        if (element == null)
+        {
+            return;
+        }
+
+        if (element.nodeName == "INPUT" || element.nodeName == "BUTTON" || element.nodeName == "TR")
+        {
+            element.style.backgroundImage = "-webkit-gradient(linear, left top, left bottom,from(rgb(255,255,255)),color-stop(0.5, rgb(221,221,221)),to(rgb(255,255,255)))";
+            element.style.color = "#333333";
+            return;
+        }
+        else if (element.nodeName == "DIV" || element.nodeName == "TD"
+                || element.nodeName == "TABLE")
+        {
+            element.style.backgroundImage = "-webkit-gradient(linear, left top, left bottom, from(rgb(255,255,255)),color-stop(0.49, rgb(233,233,233)),color-stop(0.5, rgb(221,221,221)), to(rgb(243,243,243)))";
+            element.style.color = "#333333";
+        }
+        else if (element.nodeName == "A")
+        {
+            element.style.backgroundImage = "-webkit-gradient(linear, left top, left bottom,from(rgb(255,255,255)), to(rgb(255,255,255)))";
+            element.style.color = "blue";
+        }
+        else if (element.id == "validSchedule")
+        {
+            element.style.backgroundImage = "";
+        }
+    }
+
+    // Math related functions
+    function getRandomCounterArray(numCount)
+    {
+        var origArray = [];
+        for (i = 0; i < numCount; i++)
+        {
+            origArray.push("-1");
+        }
+
+        var newArray = new Array();
+
+        for (i = 0; i < origArray.length; i++)
+        {
+            var randNum = Math.round(numCount * Math.random());
+
+            if (randNum == numCount)
+                randNum = (numCount - 1); // as we have index form 0 to numCount - 1 
+
+            if (origArray[randNum] == "-1")
+            {
+                newArray.push(randNum + 1);
+                origArray[randNum] = "0";
+            }
+            else
+            {
+                for (j = 0; j < origArray.length; j++)
+                {
+                    if (origArray[j] == "-1")
+                    {
+                        newArray.push(j + 1);
+                        origArray[j] = "0";
+                        break;
+                    }
+                }
+            }
+        }
+
+        // do manual jumble
+        var retArray = new Array();
+        while (newArray.length > 0)
+        {
+            retArray.push(newArray.pop());
+            retArray.push(newArray.shift());
+        }
+
+        return retArray;
+    }
+
+    function changeNumber(newNumber)
+    {
+        setTableOf(newNumber);
+        initMethod('LEARN_TAB'); // or PRACTICE_TAB
+    }
+
+    function changeOperatorType(newOperatorType)
+    {
+        gOpType = newOperatorType;
+        // one of the init's is redundant, but just doing it for simplicity
+        initMethodMain();
+        initMethodFlash();
+    }
+
+    function onLearn()
+    {
+        gShowTap = false;
+        $("#learnTab").addClass("ui-control-active");
+        $("#learnTab").removeClass("ui-control-inactive");
+        $("#practiceTab").addClass("ui-control-inactive");
+        $("#practiceTab").removeClass("ui-control-active");
+        $("#testTab").addClass("ui-control-inactive");
+        $("#testTab").removeClass("ui-control-active");
+        $("#cg1").trigger("updatelayout");
+        initMethod('LEARN_TAB');
+        $("#page2").hide();
+        $("#page1").show();
+    }
+
+    function onPractice()
+    {
+        gShowTap = true;
+        $("#learnTab").addClass("ui-control-inactive");
+        $("#learnTab").removeClass("ui-control-active");
+        $("#practiceTab").addClass("ui-control-active");
+        $("#practiceTab").removeClass("ui-control-inactive");
+        $("#testTab").addClass("ui-control-inactive");
+        $("#testTab").removeClass("ui-control-active");
+        $("#cg1").trigger("updatelayout");
+        initMethod('PRACTICE_TAB');
+        $("#page2").hide();
+        $("#page1").show();
+    }
+
+    function onDoTest()
+    {
+        gShowTap = false;
+        $("#learnTab").addClass("ui-control-inactive");
+        $("#learnTab").removeClass("ui-control-active");
+        $("#practiceTab").addClass("ui-control-inactive");
+        $("#practiceTab").removeClass("ui-control-active");
+        $("#testTab").addClass("ui-control-active");
+        $("#testTab").removeClass("ui-control-inactive");
+        $("#cg1").trigger("updatelayout");
+        $("#page1").hide();
+        $("#page2").show();
+        initMethod('TEST_TAB');
+    }
+
+    // init method can be called from different context
+    // Learn tab
+    // Practice tab
+    // Test tab
+    // Other
+    function initMethod(pcontext)
+    {
+        if (pcontext == 'LEARN_TAB')
+            initMethodMain();
+        if (pcontext == 'PRACTICE_TAB')
+            initMethodMain();
+        if (pcontext == 'TEST_TAB')
+            initMethodFlash();
+        if (pcontext == 'FLASH_CARD')
+            initMethodFlash();
+    }
+
+    function initMethodMain()
+    {
+        var table_of = getTableOf();
+        var operatorType = gOpType;
+        var strOperatorType;
+        var i = 1;
+        var randomArray = [];
+        if (gShowJumble)
+        {
+            randomArray = getRandomCounterArray(10);
+        }
+
+        console.log("randomArray=" + randomArray);
+
+        for (i = 1; i <= 10; i++)
+        {
+            var counterValue = i;
+            if (gShowJumble)
+            {
+                counterValue = randomArray[i - 1];
+            }
+
+            var rowValue;
+            if (operatorType == '+')
+            {
+                rowValue = table_of + counterValue;
+            }
+            else if (operatorType == '*')
+            {
+                rowValue = table_of * counterValue;
+            }
+            else if (operatorType == '/')
+            {
+                rowValue = counterValue * table_of;
+            }
+            else if (operatorType == '-')
+            {
+                rowValue = counterValue + table_of;
+            }
+
+            // convert to html string
+            strOperatorType = convertOperatorTypeToString(operatorType);
+
+            var firstDivName = "#r" + (i - 1) + "c0";
+            var secondDivName = "#r" + (i - 1) + "c2";
+            var opDivName = "#r" + (i - 1) + "c1";
+            var resultDivName = "#r" + (i - 1) + "c4";
+
+            if (operatorType == '+' || operatorType == '*')
+            {
+                $(firstDivName).html(table_of);
+                $(secondDivName).html(counterValue);
+                $(opDivName).html(strOperatorType);
+                $(resultDivName + " .answer").html(rowValue);
+            }
+            else if (operatorType == '/' || operatorType == '-')
+            {
+                $(firstDivName).html(rowValue);
+                $(secondDivName).html(table_of);
+                $(opDivName).html(strOperatorType);
+                $(resultDivName).html(counterValue);
+            }
+
+            if (gShowTap)
+            {
+                $(resultDivName + " .clickButton").show();
+            }
+            else
+            {
+                $(resultDivName + " .clickButton").hide();
+            }
+
+        }
+    }
+
+    function onTap(rowNum)
+    {
+        console.log("#r" + rowNum + "c4 .clickButton");
+        $("#r" + rowNum + "c4 .clickButton").hide();
+    }
+
+    // utility function to convert operator type to html based operator string
+    function convertOperatorTypeToString(operatorType)
+    {
+        var strOperatorType = operatorType;
+
+        if (operatorType == '+')
+        {
+            strOperatorType = '+';
+        }
+        else if (operatorType == '*')
+        {
+            strOperatorType = '&times;';
+        }
+        else if (operatorType == '/')
+        {
+            strOperatorType = '&divide;';
+        }
+        else if (operatorType == '-')
+        {
+            strOperatorType = '-';
+        }
+
+        return strOperatorType;
+    }
+
+    //
+    // flash methods
+    //
+
+    // used in flash card. how many questions to go through
+    function getCounter()
+    {
+        return parseInt(localStorage.getItem("flashCardCounter"));
+    }
+
+    function setCounter(counter)
+    {
+        localStorage.setItem("flashCardCounter", counter);
+    }
+
+    function incrementCounter()
+    {
+        setCounter(getCounter() + 1);
+    }
+
+    function initMethodFlash()
+    {
+        initQuestionAnswerData();
+        setCounter(0);
+        showQuestion();
+    }
+
+    function initQuestionAnswerData()
+    {
+        if (gIsFixedFirstNum)
+        {
+            var randomArray;
+            if (gShowJumble)
+            {
+                randomArray = getRandomCounterArray(gNumQuestions);
+            }
+
+            var fixedFirstNumber = Math.round(gMaxNum * Math.random());
+            for (i = 0; i < gNumQuestions; i++)
+            {
+                firstNumberArr[i] = fixedFirstNumber;
+                if (gShowJumble)
+                {
+                    secondNumberArr[i] = randomArray[i];
+                }
+                else
+                {
+                    secondNumberArr[i] = i + 1;
+                }
+            }
+        }
+        else
+        {
+            for (i = 0; i < gNumQuestions; i++)
+            {
+                firstNumberArr[i] = Math.round(gMaxNum * Math.random());
+                secondNumberArr[i] = Math.round(gMaxNum * Math.random());
+            }
+        }
+
+        for (i = 0; i < gNumQuestions; i++)
+        {
+            rightOrWrongArr[i] = 1; // means right
+            operatorArr[i] = calcOperatorType();
+            answersArr[i] = "";
+
+            // switch big and small numbers for subtraction
+            if (operatorArr[i] == '-')
+            {
+                if (firstNumberArr[i] < secondNumberArr[i])
+                {
+                    var tmpNum = secondNumberArr[i];
+                    secondNumberArr[i] = firstNumberArr[i];
+                    firstNumberArr[i] = tmpNum;
+                }
+            }
+
+            // switch big and small numbers for division
+            if (operatorArr[i] == '/')
+            {
+                firstNumberArr[i] = secondNumberArr[i] * Math.round(gMaxNum * Math.random());
+            }
+        }
+    }
+
+    function calcOperatorType()
+    {
+        var opType = gOpType;
+
+        if (opType == null || opType == '')
+        {
+            var tmpNum = Math.random();
+            if (tmpNum >= 0 && tmpNum < 0.25)
+                return "+";
+            else if (tmpNum >= 0.25 && tmpNum < 0.50)
+                return "-";
+            else if (tmpNum >= 0.50 && tmpNum < 0.75)
+                return "*";
+            else if (tmpNum >= 0.75 && tmpNum <= 1)
+                return "/";
+            else
+                return "+";
+        }
+
+        return opType;
+    }
+
+    function clickEnter()
+    {
+        if (checkAnswer())
+        {
+            incrementCounter();
+            //console.log("counter="+getCounter());
+            //console.log("gNumQuestions="+gNumQuestions);
+            if (getCounter() >= gNumQuestions)
+            {
+                console.log("You are done");
+                var retArr = computeRightOrWrong();
+                var okMethod = function()
+                {
+                    hidePopupBox();
+                    initMethod('FLASH_CARD');
+                };
+                var cancelMethod = function()
+                {
+                    hidePopupBox();
+                    console.log("hey1");
+                    history.back();
+                    console.log("hey2");
+                };
+                showScore(gNumQuestions, retArr[0], okMethod, cancelMethod);
+            }
+            else
+            {
+                showQuestion();
+            }
+        }
+        else
+        {
+            //$('#answerValue').addClass('wrongAnswer');
+            rightOrWrongArr[getCounter()] = 0;
+            answersArr[getCounter()] = '';
+        }
+    }
+
+    function computeRightOrWrong()
+    {
+        var wrongAnswer = 0;
+        var rightAnswer = gNumQuestions;
+        for (i = 0; i < gNumQuestions; i++)
+        {
+            if (rightOrWrongArr[i] == 0)
+            {
+                wrongAnswer += 1;
+                rightAnswer -= 1;
+            }
+        }
+
+        return new Array(rightAnswer, wrongAnswer);
+    }
+
+    function clickClear()
+    {
+        answersArr[getCounter()] = "";
+        $('#answerValue').html('&nbsp;');
+    }
+
+    function checkAnswer()
+    {
+        var currentOperation = operatorArr[getCounter()];
+        //console.log("operatorArr[getCounter()]=" + operatorArr[getCounter()]);
+        //console.log("firstNumberArr[getCounter()]=" + firstNumberArr[getCounter()]);
+        //console.log("secondNumberArr[getCounter()]=" + secondNumberArr[getCounter()]);
+        //console.log("answersArr[getCounter()]=" + answersArr[getCounter()]);
+        var correctAnswer;
+
+        if (currentOperation == '+')
+        {
+            correctAnswer = firstNumberArr[getCounter()] + secondNumberArr[getCounter()];
+        }
+        else if (currentOperation == '-')
+        {
+            correctAnswer = firstNumberArr[getCounter()] - secondNumberArr[getCounter()];
+        }
+        else if (currentOperation == '*')
+        {
+            correctAnswer = firstNumberArr[getCounter()] * secondNumberArr[getCounter()];
+        }
+        else if (currentOperation == '/')
+        {
+            correctAnswer = firstNumberArr[getCounter()] / secondNumberArr[getCounter()];
+        }
+
+        if (correctAnswer == answersArr[getCounter()])
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    function clickNumber(newNumber)
+    {
+        //$('#answerValue').removeClass('wrongAnswer');
+        answersArr[getCounter()] += new String(newNumber);
+        $('#answerValue').html(answersArr[getCounter()]);
+        return false;
+    }
+
+    function showQuestion()
+    {
+        var counter = getCounter();
+        $('#firstNumber').html(firstNumberArr[counter]);
+        $('#secondNumber').html(secondNumberArr[counter]);
+        if (operatorArr[counter] == '*')
+        {
+            $('#operatorType').html('&times;');
+        }
+        else if (operatorArr[counter] == '/')
+        {
+            $('#operatorType').html('&divide;');
+        }
+        else
+        {
+            $('#divOperatorType').html(operatorArr[counter]);
+        }
+        //console.log("answerValue-" + $('#answerValue').html() +"-");
+        //console.log("answerValue2-" + $('#answerValue').text() +"-");
+        $('#answerValue').html('&nbsp;');
+    }
+
+    function showScore(totalQuestions, correctAnswers, okCallback, cancelCallback)
+    {
+        var json = new Object();
+        json.title = "Done!";
+        json.message = correctAnswers + " out of " + totalQuestions
+                + " right.<br><br>Do another one?";
+        json.firstButtonText = "Yes";
+        json.firstButtonAction = okCallback;
+        json.secondButtonText = "No";
+        json.secondButtonAction = cancelCallback;
+
+        showPopupBox(json);
+    }
+
+    function initialLoad()
+    {
+        initMethod('LEARN_TAB');
+    }
+</script>
+
+<style>
+.segmented-control {
+    text-align: center;
+}
+
+.segmented-control .ui-controlgroup {
+    margin: 0.2em;
+}
+
+.ui-control-active,.ui-control-inactive {
+    border-style: solid;
+    border-color: gray;
+}
+
+.ui-control-active {
+    background: #BBB;
+}
+
+.ui-control-inactive {
+    background: #DDD;
+}
+
+/* set row height */
+.ui-block-a,.ui-block-b,.ui-block-c,.ui-block-d,.ui-block-e {
+    height: 2.15em;
+    position: relative;
+}
+
+.numberButton {
+    width: 70%;
+    text-align: center;
+    vertical-align: middle;
+    margin-left: auto;
+    margin-right: auto;
+    font-weight: bold;
+    line-height: 2em;
+    color: #fff;
+    border-radius: .313em;
+    border: .063em solid #82ac71;
+    background-image: -webkit-gradient(linear, center top, center bottom, from(#16c710), to(#10940b) );
+}
+
+.clickButton {
+    position: absolute;
+    z-index: 5;
+    width: 100%;
+    text-align: center;
+    vertical-align: middle;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: .75em;
+    line-height: 1.75em;
+    color: #fff;
+    opacity: 1;
+    border-radius: .313em;
+    border: .063em solid #0630e6; //
+    background-image: -webkit-gradient(linear, center top, center bottom, rgba(106, 171, 227, 1),
+        to(rgba(6, 48, 230, 1) );
+    background-image: -webkit-gradient(linear, center top, center bottom, from(#6aabe3), to(#0630e6) );
+    top: 0;
+    left: 0;
+}
+
+.overlayPos {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.calcLikeButton {
+	width: 100%;
+	text-align: center;
+	vertical-align:middle; 
+	margin-left:auto; 
+	margin-right:auto;
+	margin-bottom:.32em;
+	margin-top:.32em;
+	font-size: 2.5em;
+	font-weight: bold;
+	/*line-height: 2.35em;*/
+	border-radius: .313em;
+	border: .063em solid #bbb; 
+	/*background-image: -webkit-gradient(linear, center top, center bottom, from(#effaff), to(#89c7ed)); */
+}
+
+
+</style>
+
+</head>
+<body onload="initialLoad()">
+
+    <div data-role="page" id="home">
+
+        <div data-role="header" data-position="fixed">
+            <!-- a href="#" data-icon="delete">Cancel</a-->
+            <h1>Second Grade Math</h1>
+            <!--a href="#" data-icon="check">Done</a-->
+
+            <div class="segmented-control ui-bar-d">
+                <div id="cg1" data-role="controlgroup" data-type="horizontal">
+                    <a href="#" id="learnTab" data-role="button" class="ui-control-active"
+                        onTouchStart="onLearn()"> Learn </a> <a href="#" id="practiceTab"
+                        data-role="button" class="ui-control-inactive" onTouchStart="onPractice()">
+                        Practice </a> <a href="#" id="testTab" data-role="button"
+                        class="ui-control-inactive" onTouchStart="onDoTest()"> Test </a>
+                </div>
+            </div>
+
+        </div>
+
+        <div data-role="content">
+
+            <div id="page1">
+                <div class="ui-grid-d" style="text-align: center;">
+
+                    <!-- 1st row -->
+                    <div id="r0c0" class="ui-block-a">1</div>
+                    <div id="r0c1" class="ui-block-b">+</div>
+                    <div id="r0c2" class="ui-block-c">1</div>
+                    <div id="r0c3" class="ui-block-d">=</div>
+                    <div id="r0c4" class="ui-block-e" onTouchStart="onTap(0)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 2nd row -->
+                    <div id="r1c0" class="ui-block-a">1</div>
+                    <div id="r1c1" class="ui-block-b">+</div>
+                    <div id="r1c2" class="ui-block-c">1</div>
+                    <div id="r1c3" class="ui-block-d">=</div>
+                    <div id="r1c4" class="ui-block-e" onTouchStart="onTap(1)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 3rd row -->
+                    <div id="r2c0" class="ui-block-a">1</div>
+                    <div id="r2c1" class="ui-block-b">+</div>
+                    <div id="r2c2" class="ui-block-c">1</div>
+                    <div id="r2c3" class="ui-block-d">=</div>
+                    <div id="r2c4" class="ui-block-e" onTouchStart="onTap(2)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 4th row -->
+                    <div id="r3c0" class="ui-block-a">1</div>
+                    <div id="r3c1" class="ui-block-b">+</div>
+                    <div id="r3c2" class="ui-block-c">1</div>
+                    <div id="r3c3" class="ui-block-d">=</div>
+                    <div id="r3c4" class="ui-block-e" onTouchStart="onTap(3)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 5th row -->
+                    <div id="r4c0" class="ui-block-a">1</div>
+                    <div id="r4c1" class="ui-block-b">+</div>
+                    <div id="r4c2" class="ui-block-c">1</div>
+                    <div id="r4c3" class="ui-block-d">=</div>
+                    <div id="r4c4" class="ui-block-e" onTouchStart="onTap(4)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 6th row -->
+                    <div id="r5c0" class="ui-block-a">1</div>
+                    <div id="r5c1" class="ui-block-b">+</div>
+                    <div id="r5c2" class="ui-block-c">1</div>
+                    <div id="r5c3" class="ui-block-d">=</div>
+                    <div id="r5c4" class="ui-block-e" onTouchStart="onTap(5)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 7th row -->
+                    <div id="r6c0" class="ui-block-a">1</div>
+                    <div id="r6c1" class="ui-block-b">+</div>
+                    <div id="r6c2" class="ui-block-c">1</div>
+                    <div id="r6c3" class="ui-block-d">=</div>
+                    <div id="r6c4" class="ui-block-e" onTouchStart="onTap(6)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 8th row -->
+                    <div id="r7c0" class="ui-block-a">1</div>
+                    <div id="r7c1" class="ui-block-b">+</div>
+                    <div id="r7c2" class="ui-block-c">1</div>
+                    <div id="r7c3" class="ui-block-d">=</div>
+                    <div id="r7c4" class="ui-block-e" onTouchStart="onTap(7)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 9th row -->
+                    <div id="r8c0" class="ui-block-a">1</div>
+                    <div id="r8c1" class="ui-block-b">+</div>
+                    <div id="r8c2" class="ui-block-c">1</div>
+                    <div id="r8c3" class="ui-block-d">=</div>
+                    <div id="r8c4" class="ui-block-e" onTouchStart="onTap(8)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                    <!-- 10th row -->
+                    <div id="r9c0" class="ui-block-a">1</div>
+                    <div id="r9c1" class="ui-block-b">+</div>
+                    <div id="r9c2" class="ui-block-c">1</div>
+                    <div id="r9c3" class="ui-block-d">=</div>
+                    <div id="r9c4" class="ui-block-e" onTouchStart="onTap(9)">
+                        <div class="answer overlayPos">1</div>
+                        <div class="clickButton" style="display: none">Tap</div>
+                    </div>
+
+                </div>
+                <p></p>
+
+                <div class="ui-grid-d" style="text-align: center;">
+
+                    <div class="ui-block-a">
+                        <div class="numberButton" onTouchStart="changeNumber(1)"
+                            onClick='kb_stopEventProgress()'>1</div>
+                    </div>
+                    <div class="ui-block-b">
+                        <div class="numberButton" onTouchStart="changeNumber(2)"
+                            onClick='kb_stopEventProgress()'>2</div>
+                    </div>
+                    <div class="ui-block-c">
+                        <div class="numberButton" onTouchStart="changeNumber(3)"
+                            onClick='kb_stopEventProgress()'>3</div>
+                    </div>
+                    <div class="ui-block-d">
+                        <div class="numberButton" onTouchStart="changeNumber(4)"
+                            onClick='kb_stopEventProgress()'>4</div>
+                    </div>
+                    <div class="ui-block-e">
+                        <div class="numberButton" onTouchStart="changeNumber(5)"
+                            onClick='kb_stopEventProgress()'>5</div>
+                    </div>
+
+                    <div class="ui-block-a"></div>
+                    <div class="ui-block-b"></div>
+                    <div class="ui-block-c"></div>
+                    <div class="ui-block-d"></div>
+                    <div class="ui-block-e"></div>
+
+                    <div class="ui-block-a">
+                        <div class="numberButton" onTouchStart="changeNumber(6)"
+                            onClick='kb_stopEventProgress()'>6</div>
+                    </div>
+                    <div class="ui-block-b">
+                        <div class="numberButton" onTouchStart="changeNumber(7)"
+                            onClick='kb_stopEventProgress()'>7</div>
+                    </div>
+                    <div class="ui-block-c">
+                        <div class="numberButton" onTouchStart="changeNumber(8)"
+                            onClick='kb_stopEventProgress()'>8</div>
+                    </div>
+                    <div class="ui-block-d">
+                        <div class="numberButton" onTouchStart="changeNumber(9)"
+                            onClick='kb_stopEventProgress()'>9</div>
+                    </div>
+                    <div class="ui-block-e">
+                        <div class="numberButton" onTouchStart="changeNumber(10)"
+                            onClick='kb_stopEventProgress()'>10</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div id="page2" style="display: none">
+
+                <div class="ui-grid-b" style="text-align: center;">
+
+                    <!-- Question -->
+                    <div class="ui-block-a"><div id="firstNumber" style="text-align:right;font-size:3em;font-weight:bold;"></div></div>
+                    <div class="ui-block-b"><div id="divOperatorType" style="text-align:center;font-size:3em;font-weight:bold;"></div></div>
+                    <div class="ui-block-c"><div id="secondNumber" style="text-align:left;font-size:3em;font-weight:bold;"></div></div>
+
+                </div>
+
+		<div id="answerValue" class="calcLikeButton">&nbsp;</div>
+
+
+                <style>
+/* set row height */
+.ui-block-a,.ui-block-b,.ui-block-c {
+    height: auto;
+}
+</style>
+
+                <div class="ui-grid-b" style="text-align: center;">
+                    <!-- 1st row -->
+                    <div id="test_r0c0" class="ui-block-a" onTouchStart="clickNumber(1)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">1</a>
+                    </div>
+                    <div id="test_r0c1" class="ui-block-b" onTouchStart="clickNumber(2)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">2</a>
+                    </div>
+                    <div id="test_r0c2" class="ui-block-c" onTouchStart="clickNumber(3)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">3</a>
+                    </div>
+
+                    <!-- 2nd row -->
+                    <div id="test_r0c0" class="ui-block-a" onTouchStart="clickNumber(4)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">4</a>
+                    </div>
+                    <div id="test_r0c1" class="ui-block-b" onTouchStart="clickNumber(5)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">5</a>
+                    </div>
+                    <div id="test_r0c2" class="ui-block-c" onTouchStart="clickNumber(6)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">6</a>
+                    </div>
+
+                    <!-- 3rd row -->
+                    <div id="test_r0c0" class="ui-block-a" onTouchStart="clickNumber(7)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">7</a>
+                    </div>
+                    <div id="test_r0c1" class="ui-block-b" onTouchStart="clickNumber(8)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">8</a>
+                    </div>
+                    <div id="test_r0c2" class="ui-block-c" onTouchStart="clickNumber(9)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">9</a>
+                    </div>
+
+                    <!-- 4th row -->
+                    <div id="test_r0c0" class="ui-block-a" onTouchStart="clickClear()"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">Clear</a>
+                    </div>
+                    <div id="test_r0c1" class="ui-block-b" onTouchStart="clickNumber(0)"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">0</a>
+                    </div>
+                    <div id="test_r0c2" class="ui-block-c" onTouchStart="clickEnter()"
+                        onClick="kb_stopEventProgress()">
+                        <a href="#" data-role="button">Enter</a>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div data-role="footer" data-position="fixed">
+            <div data-role="navbar">
+                <ul>
+                    <li><a href="#" onTouchStart="changeOperatorType('+')"
+                        onClick='kb_stopEventProgress()'><span
+                            style="font-size: 1.5em; font-weight: bold;">+</span><br>Add</a></li>
+                    <li><a href="#" onTouchStart="changeOperatorType('-')"
+                        onClick='kb_stopEventProgress()'><span
+                            style="font-size: 1.5em; font-weight: bold;">&#8722;</span><br>Subtract</a></li>
+                    <li><a href="#" onTouchStart="changeOperatorType('*')"
+                        onClick='kb_stopEventProgress()'><span
+                            style="font-size: 1.5em; font-weight: bold;">&times;</span><br>Multiply</a></li>
+                    <li><a href="#" onTouchStart="changeOperatorType('+')"
+                        onClick='kb_stopEventProgress()'><span
+                            style="font-size: 1.5em; font-weight: bold;">&nbsp;</span><br>More..</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
+
+
